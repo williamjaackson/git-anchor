@@ -62,6 +62,45 @@ describe("get command", () => {
   });
 });
 
+describe("parent command", () => {
+  let repo: Repo;
+
+  beforeEach(() => {
+    repo = createRepo();
+    repo.branch("feature", "main");
+    repo.commit("f", "f", "f");
+    const mainId = repo.anchor(["get", "main"]).stdout;
+    repo.anchor(["get", "feature"]);
+    repo.git(`config branch.feature.anchorparent ${mainId}`);
+  });
+
+  afterEach(() => {
+    repo.cleanup();
+  });
+
+  test("prints parent UUID by default", () => {
+    const r = repo.anchor(["parent", "feature"]);
+
+    expect(r.ok).toBe(true);
+    expect(r.stdout).toMatch(UUID_RE);
+    expect(r.stdout).toBe(repo.configValue("branch.main.anchor"));
+  });
+
+  test("--name resolves to branch name", () => {
+    const r = repo.anchor(["parent", "feature", "--name"]);
+
+    expect(r.ok).toBe(true);
+    expect(r.stdout).toBe("main");
+  });
+
+  test("empty output + exit 0 when no parent is set", () => {
+    const r = repo.anchor(["parent", "main"]);
+
+    expect(r.ok).toBe(true);
+    expect(r.stdout).toBe("");
+  });
+});
+
 describe("resolve command", () => {
   let repo: Repo;
 
@@ -103,6 +142,51 @@ describe("resolve command", () => {
   });
 });
 
+describe("set-parent command", () => {
+  let repo: Repo;
+
+  beforeEach(() => {
+    repo = createRepo();
+    repo.branch("feature", "main");
+    repo.commit("f", "f", "f");
+    repo.branch("hotfix", "main");
+    repo.commit("h", "h", "h");
+    repo.anchor(["get", "main"]);
+    repo.anchor(["get", "feature"]);
+    repo.anchor(["get", "hotfix"]);
+  });
+
+  afterEach(() => {
+    repo.cleanup();
+  });
+
+  test("sets parent to another branch's anchor", () => {
+    const featureId = repo.configValue("branch.feature.anchor")!;
+    const r = repo.anchor(["set-parent", "hotfix", featureId]);
+
+    expect(r.ok).toBe(true);
+    expect(repo.configValue("branch.hotfix.anchorparent")).toBe(featureId);
+  });
+
+  test("rejects malformed UUID", () => {
+    const r = repo.anchor(["set-parent", "hotfix", "not-a-uuid"]);
+
+    expect(r.exitCode).toBe(1);
+    expect(r.stderr).toContain("not a valid UUID");
+  });
+
+  test("rejects UUID not bound to any branch", () => {
+    const r = repo.anchor([
+      "set-parent",
+      "hotfix",
+      "00000000-0000-4000-8000-000000000000",
+    ]);
+
+    expect(r.exitCode).toBe(1);
+    expect(r.stderr).toContain("no branch found");
+  });
+});
+
 describe("list command", () => {
   let repo: Repo;
 
@@ -121,7 +205,7 @@ describe("list command", () => {
     expect(r.stdout).toBe("");
   });
 
-  test("tab-separated rows: branch, anchor", () => {
+  test("tab-separated rows: branch, anchor, parent", () => {
     repo.branch("feature", "main");
     repo.commit("f", "f", "f");
     repo.anchor(["get", "main"]);
@@ -132,9 +216,10 @@ describe("list command", () => {
 
     expect(rows.length).toBe(2);
     const featureRow = rows.find((l) => l.startsWith("feature\t"))!;
-    const [branch, anchor] = featureRow.split("\t");
-    expect(branch).toBe("feature");
-    expect(anchor).toMatch(UUID_RE);
+    const parts = featureRow.split("\t");
+    expect(parts[0]).toBe("feature");
+    expect(parts[1]).toMatch(UUID_RE);
+    expect(parts[2]).toBe(""); // no parent set yet
   });
 
   test("--json emits structured data", () => {
@@ -150,5 +235,6 @@ describe("list command", () => {
       (e: { branch: string }) => e.branch === "feature",
     );
     expect(feature.anchor).toMatch(UUID_RE);
+    expect(feature.parent).toBeNull();
   });
 });

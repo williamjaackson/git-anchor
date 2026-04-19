@@ -4,7 +4,7 @@ import { out } from "../core/log";
 
 export default {
   name: "list",
-  description: "list all branches with their anchors",
+  description: "list all branches with their anchors and parents",
   usage: "git anchor list [--json]",
   examples: ["git anchor list", "git anchor list --json"],
   run(args: string[]) {
@@ -17,7 +17,7 @@ export default {
     }
 
     for (const e of entries) {
-      out(`${e.branch}\t${e.anchor}`);
+      out(`${e.branch}\t${e.anchor}\t${e.parent ?? ""}`);
     }
   },
 } satisfies Command;
