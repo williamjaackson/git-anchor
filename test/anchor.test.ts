@@ -121,7 +121,7 @@ describe("list command", () => {
     expect(r.stdout).toBe("");
   });
 
-  test("tab-separated rows: branch, anchor", () => {
+  test("tab-separated rows: branch, anchor, parent", () => {
     repo.branch("feature", "main");
     repo.commit("f", "f", "f");
     repo.anchor(["get", "main"]);
@@ -132,9 +132,10 @@ describe("list command", () => {
 
     expect(rows.length).toBe(2);
     const featureRow = rows.find((l) => l.startsWith("feature\t"))!;
-    const [branch, anchor] = featureRow.split("\t");
-    expect(branch).toBe("feature");
-    expect(anchor).toMatch(UUID_RE);
+    const parts = featureRow.split("\t");
+    expect(parts[0]).toBe("feature");
+    expect(parts[1]).toMatch(UUID_RE);
+    expect(parts[2]).toBe(""); // no parent set yet
   });
 
   test("--json emits structured data", () => {
@@ -150,5 +151,6 @@ describe("list command", () => {
       (e: { branch: string }) => e.branch === "feature",
     );
     expect(feature.anchor).toMatch(UUID_RE);
+    expect(feature.parent).toBeNull();
   });
 });
