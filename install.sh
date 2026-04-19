@@ -4,8 +4,8 @@
 # Latest stable:
 #   curl -fsSL https://raw.githubusercontent.com/williamjaackson/git-anchor/master/install.sh | sh
 #
-# Specific version:
-#   curl -fsSL https://raw.githubusercontent.com/williamjaackson/git-anchor/master/install.sh | sh -s v0.2.0
+# Specific version (pass the tag as the first argument):
+#   curl -fsSL https://raw.githubusercontent.com/williamjaackson/git-anchor/master/install.sh | sh -s <tag>
 #
 # Downloads the appropriate release binary for the host OS/arch and drops it
 # at $INSTALL_DIR/git-anchor (defaults to ~/.local/bin).
