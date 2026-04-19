@@ -1,7 +1,8 @@
 import type { Command } from "./types";
+import get from "./get";
 import help from "./help";
 
-const commands: Command[] = [help];
+const commands: Command[] = [get, help];
 
 const commandMap = new Map(commands.map((c) => [c.name, c]));
 
