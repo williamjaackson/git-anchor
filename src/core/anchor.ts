@@ -1,4 +1,5 @@
 import { exec, execSafe } from "./git";
+import { ensureHookInstalled } from "./hook";
 
 const ANCHOR_KEY_RE = /^branch\.(.+)\.anchor (.+)$/;
 const PARENT_KEY_RE = /^branch\.(.+)\.anchorparent (.+)$/;
@@ -79,9 +80,12 @@ export function listAnchors(): AnchorEntry[] {
 }
 
 /**
- * Lazy-create an anchor for a single branch if missing.
+ * Lazy-create an anchor for a single branch if missing. Also ensures the
+ * post-checkout hook is installed so future branch creations get captured.
+ * Cost is bounded — one config read, one file-stat — regardless of repo size.
  */
 export function ensureAnchor(branch: string): string {
+  ensureHookInstalled();
   const id = getAnchor(branch);
   if (id) return id;
   const fresh = generateId();
