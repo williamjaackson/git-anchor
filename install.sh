@@ -64,6 +64,7 @@ case ":${PATH}:" in
     printf '\n'
     printf 'Note: %s is not on your PATH.\n' "${INSTALL_DIR}"
     printf 'Add this to your shell profile:\n'
+    # shellcheck disable=SC2016  # literal $PATH intended in shown snippet
     printf '  export PATH="%s:$PATH"\n' "${INSTALL_DIR}"
     ;;
 esac
