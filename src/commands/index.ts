@@ -1,4 +1,5 @@
 import type { Command } from "./types";
+import init from "./init";
 import get from "./get";
 import parent from "./parent";
 import children from "./children";
@@ -11,6 +12,7 @@ import hookPostCheckout from "./_hookPostCheckout";
 import help from "./help";
 
 const commands: Command[] = [
+  init,
   get,
   parent,
   children,
