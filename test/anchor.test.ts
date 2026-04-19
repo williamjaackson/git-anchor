@@ -62,6 +62,45 @@ describe("get command", () => {
   });
 });
 
+describe("parent command", () => {
+  let repo: Repo;
+
+  beforeEach(() => {
+    repo = createRepo();
+    repo.branch("feature", "main");
+    repo.commit("f", "f", "f");
+    const mainId = repo.anchor(["get", "main"]).stdout;
+    repo.anchor(["get", "feature"]);
+    repo.git(`config branch.feature.anchorparent ${mainId}`);
+  });
+
+  afterEach(() => {
+    repo.cleanup();
+  });
+
+  test("prints parent UUID by default", () => {
+    const r = repo.anchor(["parent", "feature"]);
+
+    expect(r.ok).toBe(true);
+    expect(r.stdout).toMatch(UUID_RE);
+    expect(r.stdout).toBe(repo.configValue("branch.main.anchor"));
+  });
+
+  test("--name resolves to branch name", () => {
+    const r = repo.anchor(["parent", "feature", "--name"]);
+
+    expect(r.ok).toBe(true);
+    expect(r.stdout).toBe("main");
+  });
+
+  test("empty output + exit 0 when no parent is set", () => {
+    const r = repo.anchor(["parent", "main"]);
+
+    expect(r.ok).toBe(true);
+    expect(r.stdout).toBe("");
+  });
+});
+
 describe("resolve command", () => {
   let repo: Repo;
 
