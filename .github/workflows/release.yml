@@ -48,3 +48,27 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release upload "${GITHUB_REF_NAME}" dist/* --clobber
+
+      - name: Append install instructions to release body
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -e
+
+          # Snapshot the user-authored release body.
+          current_body=$(gh release view "${TAG}" --json body --jq .body)
+
+          # Strip any previously-appended managed block so re-runs stay clean.
+          clean_body=$(printf '%s' "${current_body}" | awk '
+            /<!-- begin:install -->/ { skip=1; next }
+            /<!-- end:install -->/   { skip=0; next }
+            !skip
+          ')
+
+          # Render the footer template with the live repo + tag.
+          footer=$(sed -e "s|{{REPO}}|${REPO}|g" -e "s|{{TAG}}|${TAG}|g" .github/release-body-footer.md)
+
+          # Rewrite the release notes with the user body + rendered footer.
+          printf '%s\n\n%s\n' "${clean_body}" "${footer}" | gh release edit "${TAG}" --notes-file -

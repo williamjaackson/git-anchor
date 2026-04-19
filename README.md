@@ -37,7 +37,39 @@ Rename handling is free: git's own `git branch -m` automatically migrates `branc
 
 ## Installation
 
-Requires [Bun](https://bun.sh) to build.
+### macOS and Linux (recommended)
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/williamjaackson/git-anchor/master/install.sh | sh
+```
+
+Drops the latest release binary at `~/.local/bin/git-anchor` and makes it executable. Override the target directory with `INSTALL_DIR=/somewhere/else`. If `~/.local/bin` isn't on your `PATH`, the script prints a note telling you what to add to your shell profile.
+
+To pin a specific version, pass the release tag as an argument:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/williamjaackson/git-anchor/master/install.sh | sh -s <tag>
+```
+
+Each release page shows its own install snippet with the tag pre-filled.
+
+### Windows
+
+Download `git-anchor-windows-x64.exe` from the [latest release](https://github.com/williamjaackson/git-anchor/releases/latest), rename it to `git-anchor.exe`, and put it in a directory on your `PATH`. SmartScreen will warn on first run; click "More info" then "Run anyway".
+
+### Manual download on macOS
+
+If you download the macOS binary via a browser, macOS attaches a quarantine flag and Gatekeeper will refuse to run it. Either use the `curl | sh` installer above (which bypasses the quarantine) or remove the flag manually:
+
+```sh
+xattr -d com.apple.quarantine ~/Downloads/git-anchor-darwin-arm64
+chmod +x ~/Downloads/git-anchor-darwin-arm64
+mv ~/Downloads/git-anchor-darwin-arm64 ~/.local/bin/git-anchor
+```
+
+### From source
+
+Requires [Bun](https://bun.sh):
 
 ```sh
 git clone https://github.com/williamjaackson/git-anchor
@@ -270,14 +302,14 @@ A local `git config` user can assign any UUID to any branch. This is a local met
 - **Why UUID v4 and not short hex?** (practically) Zero collision risk if anchors ever need to be shared across repos (they aren't today, but the option is open). 36 chars is fine — they appear in config and JSON, rarely on command lines.
 - **Why auto-install the hook?** Parent capture is only fully reliable at the moment a branch is created. Making it opt-in via an `install` command would mean users create branches, forget to run `install`, and silently lose parent data. Disable via `git config anchor.hook false` if you want out.
 
-## Building from source
+## Build system
 
-```sh
-bun install
-bash build.sh
-```
+`build.sh` has two modes:
 
-`build.sh` runs `bun build --compile --minify` and re-signs the resulting Mach-O binary on macOS (`codesign -f -s -`), which is required for Bun's compiled binaries to execute on recent macOS.
+- `bash build.sh` (no arguments): builds for the host platform, outputs `./git-anchor`. Ad-hoc codesigns on Darwin (required for Bun-compiled binaries to run on recent macOS).
+- `bash build.sh <target>`: cross-compiles via `bun --target=bun-<target>`, outputs to `dist/git-anchor-<target>[.exe]`. Supported targets are `darwin-arm64`, `darwin-x64`, `linux-x64`, `linux-arm64`, `windows-x64`.
+
+The release workflow calls the second form for each target on a macOS runner to produce the five release binaries.
 
 ## Project layout
 
