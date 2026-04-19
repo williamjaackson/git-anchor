@@ -1,0 +1,3 @@
+git-anchor
+*.bun-build
+node_modules/
