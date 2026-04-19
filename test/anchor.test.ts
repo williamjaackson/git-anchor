@@ -142,6 +142,51 @@ describe("resolve command", () => {
   });
 });
 
+describe("set-parent command", () => {
+  let repo: Repo;
+
+  beforeEach(() => {
+    repo = createRepo();
+    repo.branch("feature", "main");
+    repo.commit("f", "f", "f");
+    repo.branch("hotfix", "main");
+    repo.commit("h", "h", "h");
+    repo.anchor(["get", "main"]);
+    repo.anchor(["get", "feature"]);
+    repo.anchor(["get", "hotfix"]);
+  });
+
+  afterEach(() => {
+    repo.cleanup();
+  });
+
+  test("sets parent to another branch's anchor", () => {
+    const featureId = repo.configValue("branch.feature.anchor")!;
+    const r = repo.anchor(["set-parent", "hotfix", featureId]);
+
+    expect(r.ok).toBe(true);
+    expect(repo.configValue("branch.hotfix.anchorparent")).toBe(featureId);
+  });
+
+  test("rejects malformed UUID", () => {
+    const r = repo.anchor(["set-parent", "hotfix", "not-a-uuid"]);
+
+    expect(r.exitCode).toBe(1);
+    expect(r.stderr).toContain("not a valid UUID");
+  });
+
+  test("rejects UUID not bound to any branch", () => {
+    const r = repo.anchor([
+      "set-parent",
+      "hotfix",
+      "00000000-0000-4000-8000-000000000000",
+    ]);
+
+    expect(r.exitCode).toBe(1);
+    expect(r.stderr).toContain("no branch found");
+  });
+});
+
 describe("list command", () => {
   let repo: Repo;
 

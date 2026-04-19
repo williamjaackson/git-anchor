@@ -3,11 +3,21 @@ import get from "./get";
 import parent from "./parent";
 import resolve from "./resolve";
 import list from "./list";
+import setParent from "./setParent";
 import remove from "./remove";
 import version from "./version";
 import help from "./help";
 
-const commands: Command[] = [get, parent, resolve, list, remove, version, help];
+const commands: Command[] = [
+  get,
+  parent,
+  resolve,
+  list,
+  setParent,
+  remove,
+  version,
+  help,
+];
 
 const commandMap = new Map(commands.map((c) => [c.name, c]));
 
