@@ -1,5 +1,6 @@
-import { exec, execSafe } from "./git";
+import { branchExists, exec, execSafe, listLocalBranches } from "./git";
 import { ensureHookInstalled } from "./hook";
+import { parseReflogCreatedFrom } from "./reflog";
 
 const ANCHOR_KEY_RE = /^branch\.(.+)\.anchor (.+)$/;
 const PARENT_KEY_RE = /^branch\.(.+)\.anchorparent (.+)$/;
@@ -91,4 +92,91 @@ export function ensureAnchor(branch: string): string {
   const fresh = generateId();
   setAnchor(branch, fresh);
   return fresh;
+}
+
+/**
+ * Assign an anchor to `branch` if missing. Used internally by the sweep so it
+ * doesn't recurse into parent resolution for branches that already have one.
+ * Returns null if the branch doesn't exist — guards against reflog-recovered
+ * parent names that point to since-deleted branches, which would otherwise
+ * leave orphan `branch.<ghost>.anchor` entries in git config.
+ */
+function ensureAnchorIdOnly(branch: string): string | null {
+  const existing = getAnchor(branch);
+  if (existing) return existing;
+  if (!branchExists(branch)) return null;
+  const id = generateId();
+  setAnchor(branch, id);
+  return id;
+}
+
+export interface SweepReport {
+  anchored: Array<{ branch: string; anchor: string }>;
+  parented: Array<{ branch: string; parentName: string }>;
+  unrecoverable: string[];
+  unchanged: number;
+}
+
+/**
+ * Repo-wide pass: anchors every local branch that lacks one and attempts
+ * reflog-based parent recovery for anchored-but-parentless branches.
+ * Idempotent — returns a diff of what actually changed on this run.
+ *
+ * "unrecoverable" only includes branches that were anchored *this run* and
+ * whose parent still couldn't be recovered — so re-running doesn't noisily
+ * re-flag stable root branches like `main`.
+ */
+export function runSweep(): SweepReport {
+  const branches = listLocalBranches();
+
+  const before = new Map<
+    string,
+    { anchor: string | null; parent: string | null }
+  >();
+  for (const b of branches) {
+    before.set(b, { anchor: getAnchor(b), parent: getParent(b) });
+  }
+
+  for (const branch of branches) {
+    if (!getAnchor(branch)) setAnchor(branch, generateId());
+
+    if (getParent(branch)) continue;
+
+    const parentName = parseReflogCreatedFrom(branch);
+    if (!parentName || parentName === branch) continue;
+
+    const parentId = ensureAnchorIdOnly(parentName);
+    if (!parentId) continue;
+    setParent(branch, parentId);
+  }
+
+  const report: SweepReport = {
+    anchored: [],
+    parented: [],
+    unrecoverable: [],
+    unchanged: 0,
+  };
+
+  for (const branch of branches) {
+    const prev = before.get(branch)!;
+    const anchor = getAnchor(branch);
+    const parent = getParent(branch);
+    if (!anchor) continue;
+
+    const newlyAnchored = !prev.anchor;
+    const newlyParented = !prev.parent && parent !== null;
+
+    if (newlyAnchored) report.anchored.push({ branch, anchor });
+
+    if (newlyParented) {
+      const parentName = resolveAnchor(parent!);
+      if (parentName) report.parented.push({ branch, parentName });
+    } else if (newlyAnchored && !parent) {
+      report.unrecoverable.push(branch);
+    }
+
+    if (!newlyAnchored && !newlyParented) report.unchanged += 1;
+  }
+
+  return report;
 }
