@@ -61,7 +61,29 @@ export function listLocalBranches(): string[] {
   return out.split("\n").filter((s) => s.length > 0);
 }
 
+export function branchesAtSha(sha: string): string[] {
+  const out = execSafe(
+    `for-each-ref --format='%(refname:short)' --points-at ${sha} refs/heads/`,
+  ).stdout;
+  if (!out) return [];
+  return out.split("\n").filter((s) => s.length > 0);
+}
+
 export function resolveRef(ref: string): string | null {
   const r = execSafe(`rev-parse --verify ${ref}`);
   return r.ok ? r.stdout : null;
+}
+
+/**
+ * Read a git config value as a boolean. Follows git's own convention:
+ * `false`, `no`, `off`, `0` and the empty string are false; everything else
+ * (including unset when `defaultValue` says so) is true.
+ */
+export function getConfigBool(key: string, defaultValue: boolean): boolean {
+  const r = execSafe(`config --get ${key}`);
+  if (!r.ok) return defaultValue;
+  const v = r.stdout.trim().toLowerCase();
+  if (v === "") return defaultValue;
+  if (v === "false" || v === "no" || v === "off" || v === "0") return false;
+  return true;
 }
