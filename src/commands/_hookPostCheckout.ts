@@ -46,12 +46,18 @@ export default {
 } satisfies Command;
 
 function inferParent(current: string, prevSha: string): string | null {
-  const atPrev = branchesAtSha(prevSha).filter((b) => b !== current);
-  if (atPrev.length === 1 && atPrev[0]) return atPrev[0];
-
+  // Reflog is most authoritative: git writes "branch: Created from X" where
+  // X is the actual start-point (important for `git checkout -b child parent`
+  // where prev-HEAD was a different branch from the start-point).
   const fromReflog = parseReflogCreatedFrom(current);
   if (fromReflog) return fromReflog;
 
+  // Fallback: a single branch pointing at prev-HEAD's sha. Works for
+  // `git checkout -b new` with no explicit start-point.
+  const atPrev = branchesAtSha(prevSha).filter((b) => b !== current);
+  if (atPrev.length === 1 && atPrev[0]) return atPrev[0];
+
+  // Last resort: previously-checked-out branch.
   const prev = execSafe("rev-parse --abbrev-ref @{-1}").stdout;
   if (prev && prev !== "HEAD" && prev !== current) return prev;
 
