@@ -27,6 +27,12 @@ describe("detached HEAD", () => {
     expect(r.stderr).toContain("detached HEAD");
   });
 
+  test("parent without a branch arg errors", () => {
+    const r = repo.anchor(["parent"]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stderr).toContain("detached HEAD");
+  });
+
   test("explicit branch argument still works while detached", () => {
     const r = repo.anchor(["get", "feature"]);
     expect(r.ok).toBe(true);
