@@ -26,12 +26,9 @@ Two pieces of state per branch, stored in local git config:
 | `branch.<name>.anchor` | this branch's UUID |
 | `branch.<name>.anchorparent` | UUID of the parent branch |
 
-Two mechanisms keep that state up to date:
+`git anchor sweep` scans every local branch, anchors any that don't have one, and attempts reflog-based parent recovery. It's the primary way to populate state, and is safe to rerun as an idempotent refresh.
 
-1. **A `post-checkout` hook** captures the parent at the exact moment a new branch is created. It installs itself automatically the first time a command creates an anchor (`git anchor get`, `git anchor set-parent`) or when you run `git anchor init`.
-2. **`git anchor init`** sweeps the repo once to backfill anchors and best-effort parent detection for branches that existed before git-anchor was installed. Optional — only needed when you already have branches predating the tool.
-
-Pure-read commands (`list`, `parent`, `resolve`, `remove`) don't install the hook or sweep — they're side-effect-free, cheap, and safe to call from other tools or scripts.
+Individual commands (`get`, `set-parent`) lazy-create anchors on demand without requiring a sweep. Reads (`list`, `resolve`) return whatever's currently in config. Relational reads (`parent`, `children`) compensate with an automatic sweep if they can't find the queried relation; `--no-sweep` opts out of that for callers that want bounded cost and pure-read semantics.
 
 Rename handling is free: git's own `git branch -m` automatically migrates `branch.<old>.*` config entries to `branch.<new>.*`, so UUIDs follow the branch by default.
 
@@ -79,53 +76,44 @@ bash build.sh            # produces ./git-anchor (compiled binary)
 cp git-anchor ~/.local/bin/
 ```
 
-The binary must be on `PATH`. Git invokes it as `git anchor <cmd>` automatically via its plugin convention (`git-*` binaries on `PATH` become `git *` subcommands). The installed hook also calls `git anchor __hook-post-checkout`, so if the binary isn't discoverable the hook silently does nothing.
+The binary must be on `PATH`. Git invokes it as `git anchor <cmd>` automatically via its plugin convention (`git-*` binaries on `PATH` become `git *` subcommands).
 
 ## Quick start
 
-Nothing to do — just start using it. The first time you run a command that creates an anchor, the hook installs itself.
+Run `git anchor sweep` in your repo. It anchors every branch and recovers parents via reflog where possible:
 
 ```sh
-$ git anchor get
-git-anchor: installed post-checkout hook
-7c9e6679-7425-40de-944b-e07fc1f90ae7
-```
-
-From here, any new branch you create is automatically anchored and parented. If you have **pre-existing** branches you'd like to backfill in one pass, run `git anchor init`:
-
-```sh
-$ git anchor init
+$ git anchor sweep
 anchored:
   main      e863bb23-ed43-4abb-ab86-dead7ff0dfdd
   feature   a3f2b1c4-1234-4567-89ab-cdef01234567
 parented:
   feature   -> main
 ```
+
+After that, individual commands (`get`, `set-parent`) maintain state on demand, and `parent` / `children` will auto-sweep if they hit a gap. Rerun `sweep` any time you want an explicit full refresh.
 
 ## Commands
 
-### `git anchor init`
+### `git anchor sweep`
 
-Installs the `post-checkout` hook (if not already installed) and sweeps all local branches: anchors any that don't have one, and attempts reflog-based parent recovery for anchored-but-parentless branches. Idempotent — safe to rerun. Prints a report of what changed.
-
-**Optional.** The hook self-installs on first use of `get`/`set-parent`, so you only need `init` when you want to backfill pre-existing branches in one pass, or to re-sweep after disabling the hook (`anchor.hook = false`) and creating branches while it was off.
+Scans all local branches: anchors any that don't have one, and attempts reflog-based parent recovery for anchored-but-parentless branches. Idempotent, safe to rerun whenever you want to refresh state.
 
 ```sh
-$ git anchor init
-git-anchor: installed post-checkout hook
+$ git anchor sweep
 anchored:
   main      e863bb23-ed43-4abb-ab86-dead7ff0dfdd
   feature   a3f2b1c4-1234-4567-89ab-cdef01234567
 parented:
   feature   -> main
 
-$ git anchor init
+$ git anchor sweep
 nothing to do — 2 branches already set up
 ```
 
 ### `git anchor get [branch] [--no-create]`
 
-Prints the anchor UUID for `branch`, or the current branch if omitted. Lazy-creates an anchor for that one branch if it doesn't have one, and installs the `post-checkout` hook the first time it runs. Does **not** run the repo-wide sweep — use `init` for that.
+Prints the anchor UUID for `branch`, or the current branch if omitted. Lazy-creates an anchor for that one branch if it doesn't have one. Does **not** run the repo-wide sweep — use `sweep` for that.
 
 Flags:
 - `--no-create` — exits 1 if no anchor exists instead of creating one.
@@ -138,9 +126,11 @@ $ git anchor get feature --no-create
 # prints uuid, or exits 1 silently if unset
 ```
 
-### `git anchor parent [branch] [--name]`
+### `git anchor parent [branch] [--name] [--no-sweep]`
 
 Prints the parent anchor UUID, or the parent branch name with `--name`. Empty output + exit 0 if no parent is recorded.
+
+If no parent is recorded, runs a full sweep to try to recover it. Pass `--no-sweep` to skip that fallback and get a pure, predictable-cost read.
 
 ```sh
 $ git anchor parent feature
@@ -150,9 +140,11 @@ $ git anchor parent feature --name
 main
 ```
 
-### `git anchor children [branch] [--name]`
+### `git anchor children [branch] [--name] [--no-sweep]`
 
-Prints the anchor UUIDs of every branch whose parent is `branch` (or the current branch if omitted). `--name` prints branch names instead. Output is sorted alphabetically by branch name; empty output if the branch has no children. Pure read — no side effects, does not install the hook.
+Prints the anchor UUIDs of every branch whose parent is `branch` (or the current branch if omitted). `--name` prints branch names instead. Output is sorted alphabetically by branch name.
+
+If no children are recorded, runs a full sweep in case there are branches whose parent pointer hasn't been populated yet. Pass `--no-sweep` to skip that fallback. Leaf branches under the default behavior will pay one sweep per invocation, since there's no way to distinguish "legit leaf" from "unpopulated."
 
 ```sh
 $ git anchor children main --name
@@ -200,7 +192,7 @@ set parent of 'feature' to e863bb23-ed43-4abb-ab86-dead7ff0dfdd
 Clears both the anchor and the parent for `branch` (or the current branch). Does not delete the branch itself.
 
 Flags:
-- `--parent` — clears only the recorded parent, leaving the anchor intact. Use when `set-parent` was pointed at the wrong branch or when you want parent detection to re-run on the next `init`.
+- `--parent` — clears only the recorded parent, leaving the anchor intact. Use when `set-parent` was pointed at the wrong branch or when you want parent detection to re-run on the next `sweep`.
 
 ```sh
 $ git anchor remove feature
@@ -229,33 +221,14 @@ Global help, or per-command help with a command name.
 
 Note: `git anchor --help` does **not** work — git intercepts `--help` and tries to open a man page, which this plugin doesn't ship. Use `git anchor help` instead.
 
-## Configuration
-
-### `anchor.hook` (boolean, default `true`)
-
-Controls the `post-checkout` hook.
-
-```sh
-git config anchor.hook false     # disable
-git config anchor.hook true      # re-enable (or unset)
-```
-
-When disabled:
-- `git anchor init` skips hook installation.
-- An already-installed hook self-deactivates — the handler bails out early after checking the config, without needing to edit the hook file. Flip back to `true` and the hook resumes.
-
-See [Limitations](#limitations) for what you lose when the hook is off.
-
 ## Parent detection
 
-The hook records parents with this priority:
+`git anchor sweep` recovers parents from reflog with this priority:
 
-1. **Branches at `prev-sha`** — if exactly one branch (other than the new one) points at the commit HEAD was on before the checkout, that's the parent. Most reliable.
-2. **Own reflog `branch: Created from X`** — if X isn't `HEAD`.
-3. **HEAD reflog fallback** — finds `checkout: moving from <X> to <new-branch>` in HEAD's reflog. Handles `git checkout -b <name>` without an explicit source.
-4. **`@{-1}`** — previous branch.
+1. **Own reflog `branch: Created from X`** — if X isn't `HEAD`.
+2. **HEAD reflog fallback** — finds `checkout: moving from <X> to <new-branch>` in HEAD's reflog. Handles `git checkout -b <name>` without an explicit source.
 
-`git anchor init`'s sweep uses strategies 2 and 3 only — 1 and 4 depend on information that's only available at checkout time, which is why the hook is the primary capture path.
+When neither signal produces a valid existing branch, the branch is reported as `no parent recoverable` in the sweep report.
 
 ## Limitations
 
@@ -265,22 +238,17 @@ All state lives in local git config. It does not cross clones — a fresh clone 
 
 If you need cross-clone persistence, git-anchor isn't the right tool. Refs under `refs/anchors/*` would be pushable, but they'd go stale on every commit and need constant rewriting; a committed `.gitanchor.json` would conflict on merges.
 
-### Hook requires `git-anchor` on PATH
+### Parent recovery is best-effort
 
-The hook calls `git anchor __hook-post-checkout`. If the binary isn't discoverable, the hook silently does nothing (`|| true`). Symptoms: new branches get anchors when you next run `git anchor get`, but without recorded parents.
-
-### Pre-existing branches have limited parent recovery
-
-For branches created before `git-anchor` was installed, parent detection depends entirely on reflog contents. Known failure cases:
+Parent detection depends on reflog contents. Known failure cases:
 
 | Case | Recoverable? |
 |---|---|
 | `git checkout -b b main` (explicit source) | Yes — own reflog records "Created from main" |
 | `git checkout -b b` from `main` | Yes — HEAD reflog fallback finds "moving from main to b" |
-| Parent renamed before first `git anchor` call | No — reflog still names the old branch, but it no longer exists. We detect this and skip (no ghost entries written). |
+| Parent renamed before `git anchor sweep` is run | No — reflog still names the old branch, but it no longer exists. We detect this and skip (no ghost entries written). |
 | Reflog expired (default 30–90 days) | No |
 | Clone-created tracking branches | No — reflog says `clone:`, not a branch name |
-| Multiple branches at the same commit when you branched | Ambiguous after the fact; hook would have disambiguated via prev-sha |
 
 Use `git anchor set-parent <branch> <parent-id>` to fix any of these manually.
 
@@ -300,7 +268,7 @@ A local `git config` user can assign any UUID to any branch. This is a local met
 
 - **Why git config, not refs or tracked files?** Git auto-migrates `branch.<old>.*` entries to `branch.<new>.*` when a branch is renamed. That makes rename handling free. Refs break on every commit; tracked files conflict on merges.
 - **Why UUID v4 and not short hex?** (practically) Zero collision risk if anchors ever need to be shared across repos (they aren't today, but the option is open). 36 chars is fine — they appear in config and JSON, rarely on command lines.
-- **Why auto-install the hook?** Parent capture is only fully reliable at the moment a branch is created. Making it opt-in via an `install` command would mean users create branches, forget to run `install`, and silently lose parent data. Disable via `git config anchor.hook false` if you want out.
+- **Why no `post-checkout` hook (yet)?** A hook could capture parents at branch creation and avoid needing the sweep fallback, but hook installation has awkward interactions with tools like husky that commit their own hooks directory. That's tracked for a later release; for now the tool is intentionally local-only state with `sweep` (and the auto-sweep fallback on `parent` / `children`) as the refresh lever.
 
 ## Build system
 
@@ -317,17 +285,15 @@ The release workflow calls the second form for each target on a macOS runner to 
 src/
   index.ts                  CLI dispatcher
   core/
-    anchor.ts               get/set/resolve/list/ensureAnchor primitives
+    anchor.ts               get/set/resolve/list/ensureAnchor primitives + runSweep
     git.ts                  exec wrapper + branch/ref helpers
-    hook.ts                 ensureHookInstalled + isHookEnabled
     reflog.ts               parseReflogCreatedFrom (own + HEAD fallback)
     log.ts                  out / info / err with TTY-gated ANSI
     error.ts                AnchorError
   commands/
     index.ts                command registry
     types.ts                Command interface
-    get.ts parent.ts resolve.ts list.ts setParent.ts remove.ts help.ts
-    _hookPostCheckout.ts    internal, invoked by the hook
+    sweep.ts get.ts parent.ts children.ts resolve.ts list.ts setParent.ts remove.ts version.ts help.ts
 ```
 
 ## License

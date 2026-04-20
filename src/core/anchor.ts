@@ -1,5 +1,4 @@
 import { branchExists, exec, execSafe, listLocalBranches } from "./git";
-import { ensureHookInstalled } from "./hook";
 import { parseReflogCreatedFrom } from "./reflog";
 
 const ANCHOR_KEY_RE = /^branch\.(.+)\.anchor (.+)$/;
@@ -81,12 +80,11 @@ export function listAnchors(): AnchorEntry[] {
 }
 
 /**
- * Lazy-create an anchor for a single branch if missing. Also ensures the
- * post-checkout hook is installed so future branch creations get captured.
- * Cost is bounded — one config read, one file-stat — regardless of repo size.
+ * Lazy-create an anchor for a single branch if missing. Bounded cost: one
+ * config read plus an optional one config write when the anchor doesn't
+ * already exist.
  */
 export function ensureAnchor(branch: string): string {
-  ensureHookInstalled();
   const id = getAnchor(branch);
   if (id) return id;
   const fresh = generateId();
