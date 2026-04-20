@@ -1,5 +1,5 @@
 import { execSync, spawnSync } from "child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
+import { mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 
@@ -24,9 +24,6 @@ export interface Repo {
   branch(name: string, from?: string): void;
   checkout(name: string): void;
   head(ref: string): string;
-  hookPath(): string;
-  hookExists(): boolean;
-  readHook(): string;
   configValue(key: string): string | null;
   cleanup(): void;
 }
@@ -81,15 +78,6 @@ export function createRepo(opts: { defaultBranch?: string } = {}): Repo {
     },
     head(ref: string) {
       return this.git(`rev-parse ${ref}`);
-    },
-    hookPath() {
-      return join(path, ".git", "hooks", "post-checkout");
-    },
-    hookExists() {
-      return existsSync(this.hookPath());
-    },
-    readHook() {
-      return readFileSync(this.hookPath(), "utf-8");
     },
     configValue(key: string) {
       const r = this.gitSafe(`config --get ${key}`);

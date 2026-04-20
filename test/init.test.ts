@@ -12,7 +12,7 @@ describe("init command", () => {
     repo.cleanup();
   });
 
-  test("anchors every local branch and installs the hook", () => {
+  test("anchors every local branch", () => {
     repo.branch("feature", "main");
     repo.commit("f", "f", "f");
 
@@ -21,7 +21,6 @@ describe("init command", () => {
     expect(result.ok).toBe(true);
     expect(repo.configValue("branch.main.anchor")).toMatch(UUID_RE);
     expect(repo.configValue("branch.feature.anchor")).toMatch(UUID_RE);
-    expect(repo.hookExists()).toBe(true);
   });
 
   test("captures parent via reflog", () => {
@@ -90,11 +89,4 @@ describe("init command", () => {
     expect(second.stdout).not.toContain("no parent recoverable:");
   });
 
-  test("skips hook install when anchor.hook=false", () => {
-    repo.git("config anchor.hook false");
-    repo.anchor(["init"]);
-
-    expect(repo.hookExists()).toBe(false);
-    expect(repo.configValue("branch.main.anchor")).toMatch(UUID_RE);
-  });
 });

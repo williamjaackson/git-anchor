@@ -1,15 +1,13 @@
 import type { Command } from "./types";
 import { runSweep } from "../core/anchor";
-import { ensureHookInstalled } from "../core/hook";
 import { out } from "../core/log";
 
 export default {
   name: "init",
-  description: "install hook and backfill anchors/parents for existing branches",
+  description: "backfill anchors and parents for existing branches",
   usage: "git anchor init",
   examples: ["git anchor init"],
   run(_args: string[]) {
-    ensureHookInstalled();
     const report = runSweep();
 
     const totalChanges =

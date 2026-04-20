@@ -8,7 +8,6 @@ import list from "./list";
 import setParent from "./setParent";
 import remove from "./remove";
 import version from "./version";
-import hookPostCheckout from "./_hookPostCheckout";
 import help from "./help";
 
 const commands: Command[] = [
@@ -22,7 +21,6 @@ const commands: Command[] = [
   remove,
   version,
   help,
-  hookPostCheckout,
 ];
 
 const commandMap = new Map(commands.map((c) => [c.name, c]));
