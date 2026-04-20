@@ -1,0 +1,43 @@
+{
+  "name": "git-anchor",
+  "version": "0.2.0",
+  "description": "Persistent UUIDs for git branches, and tracked parents",
+  "keywords": [
+    "git",
+    "git-plugin",
+    "branches",
+    "uuid"
+  ],
+  "homepage": "https://github.com/williamjaackson/git-anchor",
+  "bugs": "https://github.com/williamjaackson/git-anchor/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/williamjaackson/git-anchor.git"
+  },
+  "license": "MIT",
+  "author": "williamjaackson",
+  "bin": {
+    "git-anchor": "./bin/git-anchor.js"
+  },
+  "scripts": {
+    "postinstall": "node install.js"
+  },
+  "os": [
+    "darwin",
+    "linux",
+    "win32"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ],
+  "files": [
+    "bin",
+    "install.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=16"
+  }
+}
