@@ -28,5 +28,5 @@ trap cleanup EXIT
 cp ../README.md ./README.md
 cp ../LICENSE ./LICENSE
 
-echo "npm: publishing git-anchor@${PKG_VERSION}"
-npm publish "$@"
+echo "npm: publishing git-anchor@${PKG_VERSION} via \`bun publish\`"
+bun publish "$@"
