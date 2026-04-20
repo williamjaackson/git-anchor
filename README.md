@@ -50,6 +50,14 @@ curl -fsSL https://raw.githubusercontent.com/williamjaackson/git-anchor/master/i
 
 Each release page shows its own install snippet with the tag pre-filled.
 
+### npm
+
+```sh
+npm install -g git-anchor
+```
+
+Also works with `bun install -g git-anchor` or `pnpm add -g git-anchor`. A postinstall script downloads the matching platform binary (darwin-arm64/x64, linux-arm64/x64, or windows-x64) from GitHub releases.
+
 ### Windows
 
 Download `git-anchor-windows-x64.exe` from the [latest release](https://github.com/williamjaackson/git-anchor/releases/latest), rename it to `git-anchor.exe`, and put it in a directory on your `PATH`. SmartScreen will warn on first run; click "More info" then "Run anyway".
