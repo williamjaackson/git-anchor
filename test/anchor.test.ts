@@ -101,6 +101,43 @@ describe("parent command", () => {
   });
 });
 
+describe("parent command auto-sweep", () => {
+  let repo: Repo;
+
+  beforeEach(() => {
+    repo = createRepo();
+    repo.branch("feature", "main");
+    repo.commit("f", "f", "f");
+    // Anchor feature directly via config so there's no parent recorded yet.
+    repo.git("config branch.feature.anchor 11111111-1111-4111-8111-111111111111");
+  });
+
+  afterEach(() => {
+    repo.cleanup();
+  });
+
+  test("compensates with a sweep when parent is not recorded", () => {
+    const r = repo.anchor(["parent", "feature", "--name"]);
+
+    expect(r.ok).toBe(true);
+    expect(r.stdout).toBe("main");
+    // Sweep should have also anchored main and set feature's parent pointer.
+    expect(repo.configValue("branch.main.anchor")).toMatch(UUID_RE);
+    expect(repo.configValue("branch.feature.anchorparent")).toBe(
+      repo.configValue("branch.main.anchor"),
+    );
+  });
+
+  test("--no-sweep skips compensation and returns empty", () => {
+    const r = repo.anchor(["parent", "feature", "--no-sweep"]);
+
+    expect(r.ok).toBe(true);
+    expect(r.stdout).toBe("");
+    // Sweep should NOT have run — main stays unanchored.
+    expect(repo.configValue("branch.main.anchor")).toBeNull();
+  });
+});
+
 describe("resolve command", () => {
   let repo: Repo;
 

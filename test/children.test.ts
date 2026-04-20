@@ -71,10 +71,49 @@ describe("children command", () => {
   });
 
   test("empty output if the branch has no anchor yet", () => {
-    // Remove main's anchor; children lookup should short-circuit cleanly
+    // Remove main's anchor; lazy-create via ensureAnchor gives it a fresh
+    // UUID and the existing children still point at the old anchor, so
+    // children lookup correctly finds none.
     repo.anchor(["remove", "main"]);
-    const r = repo.anchor(["children", "main"]);
+    const r = repo.anchor(["children", "main", "--no-sweep"]);
     expect(r.ok).toBe(true);
     expect(r.stdout).toBe("");
+  });
+});
+
+describe("children command auto-sweep", () => {
+  let repo: Repo;
+
+  beforeEach(() => {
+    repo = createRepo();
+    repo.branch("feature", "main");
+    repo.commit("f", "f", "f");
+    repo.branch("hotfix", "main");
+    repo.commit("h", "h", "h");
+    repo.checkout("main");
+    // Note: no anchoring done yet. main, feature, hotfix have no anchors
+    // and no parents recorded. Children will have to sweep.
+  });
+
+  afterEach(() => {
+    repo.cleanup();
+  });
+
+  test("recovers children via sweep when none are recorded", () => {
+    const r = repo.anchor(["children", "main", "--name"]);
+
+    expect(r.ok).toBe(true);
+    const names = r.stdout.split("\n").filter(Boolean).sort();
+    expect(names).toEqual(["feature", "hotfix"]);
+  });
+
+  test("--no-sweep returns empty without compensating", () => {
+    const r = repo.anchor(["children", "main", "--name", "--no-sweep"]);
+
+    expect(r.ok).toBe(true);
+    expect(r.stdout).toBe("");
+    // Children UUIDs not populated because sweep didn't run
+    expect(repo.configValue("branch.feature.anchorparent")).toBeNull();
+    expect(repo.configValue("branch.hotfix.anchorparent")).toBeNull();
   });
 });
