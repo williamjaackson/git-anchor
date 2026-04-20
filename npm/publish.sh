@@ -10,7 +10,7 @@ set -e
 
 cd "$(dirname "$0")"
 
-PKG_VERSION=$(node -p "require('./package.json').version")
+PKG_VERSION=$(bun -e "console.log(require('./package.json').version)")
 LATEST_TAG=$(git describe --tags --abbrev=0 --match 'v*')
 EXPECTED="v${PKG_VERSION}"
 
