@@ -3,10 +3,10 @@ import { runSweep } from "../core/anchor";
 import { out } from "../core/log";
 
 export default {
-  name: "init",
-  description: "backfill anchors and parents for existing branches",
-  usage: "git anchor init",
-  examples: ["git anchor init"],
+  name: "sweep",
+  description: "anchor every local branch and recover parents from reflog",
+  usage: "git anchor sweep",
+  examples: ["git anchor sweep"],
   run(_args: string[]) {
     const report = runSweep();
 

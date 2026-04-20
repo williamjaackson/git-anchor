@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { createRepo, type Repo, UUID_RE } from "./helpers";
 
-describe("init command", () => {
+describe("sweep command", () => {
   let repo: Repo;
 
   beforeEach(() => {
@@ -16,7 +16,7 @@ describe("init command", () => {
     repo.branch("feature", "main");
     repo.commit("f", "f", "f");
 
-    const result = repo.anchor(["init"]);
+    const result = repo.anchor(["sweep"]);
 
     expect(result.ok).toBe(true);
     expect(repo.configValue("branch.main.anchor")).toMatch(UUID_RE);
@@ -27,7 +27,7 @@ describe("init command", () => {
     repo.branch("feature", "main");
     repo.commit("f", "f", "f");
 
-    repo.anchor(["init"]);
+    repo.anchor(["sweep"]);
 
     const mainAnchor = repo.configValue("branch.main.anchor");
     const featureParent = repo.configValue("branch.feature.anchorparent");
@@ -40,7 +40,7 @@ describe("init command", () => {
     repo.branch("fix-2", "fix-1");
     repo.commit("b", "b", "b");
 
-    repo.anchor(["init"]);
+    repo.anchor(["sweep"]);
 
     const fix1Anchor = repo.configValue("branch.fix-1.anchor");
     const fix2Parent = repo.configValue("branch.fix-2.anchorparent");
@@ -51,7 +51,7 @@ describe("init command", () => {
     repo.branch("feature", "main");
     repo.commit("f", "f", "f");
 
-    const result = repo.anchor(["init"]);
+    const result = repo.anchor(["sweep"]);
 
     expect(result.stdout).toContain("anchored:");
     expect(result.stdout).toContain("main");
@@ -65,8 +65,8 @@ describe("init command", () => {
     repo.branch("feature", "main");
     repo.commit("f", "f", "f");
 
-    repo.anchor(["init"]);
-    const second = repo.anchor(["init"]);
+    repo.anchor(["sweep"]);
+    const second = repo.anchor(["sweep"]);
 
     expect(second.ok).toBe(true);
     expect(second.stdout).toContain("nothing to do");
@@ -76,15 +76,15 @@ describe("init command", () => {
 
   test("flags newly-anchored branches with no recoverable parent", () => {
     // main has no parent by design
-    const result = repo.anchor(["init"]);
+    const result = repo.anchor(["sweep"]);
 
     expect(result.stdout).toContain("no parent recoverable:");
     expect(result.stdout).toContain("main");
   });
 
   test("does not reflag unrecoverable branches on rerun", () => {
-    repo.anchor(["init"]);
-    const second = repo.anchor(["init"]);
+    repo.anchor(["sweep"]);
+    const second = repo.anchor(["sweep"]);
 
     expect(second.stdout).not.toContain("no parent recoverable:");
   });
